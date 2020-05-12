@@ -5,11 +5,11 @@
  */
 // #include <MQTT.h>
 #ifdef ESP32
-# include <WiFi.h>
+#include <WiFi.h>
 #else
-# ifdef ESP8266
-#   include <ESP8266WiFi.h>
-# endif
+#ifdef ESP8266
+#include <ESP8266WiFi.h>
+#endif
 #endif
 #include <PubSubClient.h> // lmroy version! https://github.com/lmroy/pubsubclient
 #include <Base64.h>
@@ -27,16 +27,18 @@
 
 // Comment this out to strip all debugging messages
 #define G_DEBUG true
+
 #include "private-data.h"
 #include "gdebug.h"
+#include "SensorMQTT.hpp"
+
 #ifdef G_DEBUG
-  // Get DHT debugging messages, except this didn't work 
-  // three years ago. Edit DHT.h directly mebbe? Ah, maybe
-  // a prior include includes DHT.h!!!
-# define DHT_DEBUG
+// Get DHT debugging messages, except this didn't work
+// three years ago. Edit DHT.h directly mebbe? Ah, maybe
+// a prior include includes DHT.h and the guard #ifdef guards!!!
+#define DHT_DEBUG
 #endif
 #include <DHT.h>
-
 
 // Pins to avoid! ESP8266
 /****************************************************
@@ -275,15 +277,15 @@ void setvar(String var)
   }
 }
 
-void mqttcallback(char* topic, byte* payload, unsigned int length)
+void mqttcallback(char *topic, byte *payload, unsigned int length)
 {
   GDEBUG_PRINT(topic);
   GDEBUG_PRINT(" => ");
-
+#ifdef NotBloodyLikely
   // Process bind response, setting device ID appropriately
-  if (topic == "bind/" + cid)
+  if (!strcmp(topic, strcat("bind/", cid.c_str())))
   {
-    devid = String((char*)payload);
+    devid = String((char *)payload);
   }
 
   // Process persistent data
@@ -308,6 +310,7 @@ void mqttcallback(char* topic, byte* payload, unsigned int length)
       GDEBUG_PRINTLN(pub.payload_string());
     }
   }
+#endif
 }
 /*****************************************************
  #####################################################
@@ -358,12 +361,14 @@ void setup()
         mqttclient.loop();
       }
       GDEBUG_PRINTLN("...done.");
+#ifdef NotBloodyLikely
       // All other subscriptions (and publishes) use device id
       mqttclient.subscribe(MQTT::Subscribe()
                                .add_topic("control/" + devid + "/#", 1)
                                .add_topic("persist/" + devid + "/set", 1));
       mqttclient.publish(MQTT::Publish("persist/fetch", devid)
                              .set_qos(1));
+#endif
       GDEBUG_PRINT("Waiting for persistent variables...");
       two_second_pause();
     }
@@ -396,9 +401,9 @@ void control_valves()
 
 /*****************************************************
  *
- * five_second_pause
+ * two_second_pause
  *
- * Do an mqtt loop 50 times at 100ms intervals
+ * Do an mqtt loop 40 times at 50ms intervals
  *
  *****************************************************/
 void two_second_pause()
@@ -424,55 +429,6 @@ void loop()
 }
 
 /*****************************************************
- *
- * connect_to_AP
- *
- * What it says on the box, connects  to
- * predefined AP, returns SUCCESS or
- * FAILURE after maximum 15 seconds (30 x 500ms)
- *
- ****************************************************/
-int connect_to_AP()
-{
-  /* */
-  //#define ALTERNATIVE_METHOD
-#ifdef ALTERNATIVE_METHOD
-  GDEBUG_PRINT("Connecting by alternative method to ");
-  GDEBUG_PRINT(AP_SSID);
-  GDEBUG_PRINTLN("...");
-  WiFi.begin(AP_SSID, AP_PASSWORD);
-  if (WiFi.status() != WL_CONNECTED)
-  {
-    WiFi.begin(AP_SSID, AP_PASSWORD);
-
-    if (WiFi.waitForConnectResult() != WL_CONNECTED)
-    {
-      GDEBUG_PRINTLN("Failed to connect to AP");
-      return FAILURE;
-    }
-  }
-#else
-  GDEBUG_PRINT("Connecting to ");
-  GDEBUG_PRINT(AP_SSID);
-
-  WiFi.begin(AP_SSID, AP_PASSWORD);
-  int counter = 0;
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(500);
-    if (++counter > 30)
-      return FAILURE;
-    GDEBUG_PRINT(".");
-  }
-#endif
-
-  GDEBUG_PRINT("WiFi connected, IP address: ");
-  GDEBUG_PRINTLN(WiFi.localIP());
-
-  return SUCCESS;
-}
-
-/*****************************************************
  * request_bind
  *
  * subscribe to bind/<chipid>
@@ -483,6 +439,7 @@ int connect_to_AP()
  ****************************************************/
 int request_bind()
 {
+#ifdef NotBloodyLikely
   if (!mqttclient.connected())
   {
     if (!mqttclient.connect(MQTT::Connect("Client" + devid)
@@ -504,6 +461,7 @@ int request_bind()
                          .set_qos(0));
   mqttclient.loop();
   GDEBUG_PRINTLN("request_bind: request sent");
+#endif
   return SUCCESS;
 }
 
@@ -516,7 +474,7 @@ void read_sensors()
 {
   GDEBUG_PRINTLN("read_sensors");
   float temp = -127.0;
-
+#ifdef NotBloodyLikely
   // Connect to mqtt if not already connected
   if (!mqttclient.connected())
   {
@@ -532,6 +490,7 @@ void read_sensors()
       return;
     }
   }
+#endif
 
   /*** This assumes we're not using analogue input pin for an actual sensor ***/
   //  if (mqttclient.connected()) {
@@ -546,6 +505,7 @@ void read_sensors()
   for (int i = 0; i < sensorcount; i++)
   {
     GDEBUG_PRINTLN("sensortype[" + String(i) + "]=<" + String(sensortype[i]) + ">");
+#ifdef NotBloodyLikely
     if (sensortype[i] == DHT11 or sensortype[i] == DHT21 || sensortype[i] == DHT22)
     {
       dhtp = new DHT(String(sensorpins[i]).toInt(), sensortype[i]);
@@ -668,6 +628,7 @@ void read_sensors()
       //                        );
       //      mqttclient.loop();
     }
+#endif
   }
 }
 /*****************************************************
@@ -677,9 +638,7 @@ void read_sensors()
  ****************************************************/
 void deep_sleep(long microseconds)
 {
-  GDEBUG_PRINT("About to sleep for ");
-  GDEBUG_PRINT(microseconds);
-  GDEBUG_PRINTLN(" microseconds...");
+  GDEBUG_PRINTF("About to sleep for %ld microseconds...\n\n", microseconds);
   ESP.deepSleep(microseconds, WAKE_RF_DEFAULT); // Sleep for required time
 }
 
@@ -779,4 +738,52 @@ void setvalve(int index, int state)
     delay(VALVEPULSEWIDTH);
     digitalWrite(valvepin2[index], HIGH);
   }
+}
+/*****************************************************
+ *
+ * connect_to_AP
+ *
+ * What it says on the box, connects  to
+ * predefined AP, returns SUCCESS or
+ * FAILURE after maximum 15 seconds (30 x 500ms)
+ *
+ ****************************************************/
+int connect_to_AP()
+{
+  /* */
+  //#define ALTERNATIVE_METHOD
+#ifdef ALTERNATIVE_METHOD
+  GDEBUG_PRINT("Connecting by alternative method to ");
+  GDEBUG_PRINT(AP_SSID);
+  GDEBUG_PRINTLN("...");
+  WiFi.begin(AP_SSID, AP_PASSWORD);
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    WiFi.begin(AP_SSID, AP_PASSWORD);
+
+    if (WiFi.waitForConnectResult() != WL_CONNECTED)
+    {
+      GDEBUG_PRINTLN("Failed to connect to AP");
+      return FAILURE;
+    }
+  }
+#else
+  GDEBUG_PRINT("Connecting to ");
+  GDEBUG_PRINT(AP_SSID);
+
+  WiFi.begin(AP_SSID, AP_PASSWORD);
+  int counter = 0;
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    if (++counter > 30)
+      return FAILURE;
+    GDEBUG_PRINT(".");
+  }
+#endif
+
+  GDEBUG_PRINT("\nWiFi connected, IP address: ");
+  GDEBUG_PRINTLN(WiFi.localIP());
+
+  return SUCCESS;
 }
