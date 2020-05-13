@@ -31,6 +31,7 @@
 #include "private-data.h"
 #include "gdebug.h"
 #include "SensorMQTT.hpp"
+#include "gitversion.h"
 
 #ifdef G_DEBUG
 // Get DHT debugging messages, except this didn't work
