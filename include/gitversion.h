@@ -1,6 +1,1 @@
-#ifndef _GITVERSION_H_
-#define _GITVERSION_H_
-
-extern const char* gitversion;
-
-#endif // _GITVERSION_H_
+const char *gitHEAD = "c28a777dea7f091f053cb3bb219f67fa9abbae77";

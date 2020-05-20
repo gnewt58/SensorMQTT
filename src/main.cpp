@@ -10,9 +10,12 @@
 // #include <MQTT.h>
 #if defined(ESP32)
 #include <WiFi.h>
+#include <WiFiMulti.h>
+class WiFiMulti WiFiMulti;
 #elif defined(ESP8266)
 #include <ESP8266WiFi.h>
 #endif
+#include <SPI.h>
 #include <PubSubClient.h>
 #include <Base64.h>
 #include <OneWire.h>
@@ -25,7 +28,7 @@
  * Customisation section
  *
  *****************************************************/
-#define SKETCHVERS "v.20200517"
+#define SKETCHVERS "v.20200519"
 
 #include "private-data.h"
 #include "SensorMQTT.hpp"
@@ -113,19 +116,13 @@ IPAddress mqttserver(192, 168, MQTT_OCTET3, 1);
 #define MAX_VALVES 10
 #define MAX_SENSORS 10
 #define MAX_PINSTRINGLENGTH 6
-#define VALVE1A 12
+// #define VALVE1A D6
 // D6 = GPIO 12
-#define VALVE1B 14
+// #define VALVE1B D5
 // D5 = GPIO 14
 // ms to pulse the valve
-#define VALVEPULSEWIDTH 20
+#define VALVEPULSEWIDTH 40
 
-#define DHTPIN D7
-#define DHTTYPE DHT22
-//#define DHTTYPE DHT11
-//#define DHTTYPE DHT21
-
-//DHT dht(DHTPIN, DHTTYPE);
 DHT *dhtp;
 
 /*****************************************************
@@ -154,8 +151,6 @@ OneWire *oneWirep;
 #if defined(ESP8266)
 String cid(ESP.getChipId());
 #elif defined(ESP32)
-#pragma message("This is an ESP32 board: " ARDUINO_BOARD)
-
 char sChipID[13];
 static char *getChipId(char *);
 String cid(getChipId(sChipID));
@@ -168,8 +163,8 @@ String cid(getChipId(sChipID));
 static char *getChipId(char *sChipID)
 {
   uint64_t chipid;
-  chipid = ESP.getEfuseMac();                                               //The chip ID is essentially its MAC address(length: 6 bytes).
-  sprintf(sChipID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid); //print High 2 then Low 4bytes.
+  chipid = ESP.getEfuseMac();                  //The chip ID is essentially its MAC address(length: 6 bytes).
+  sprintf(sChipID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid); //print High 2 then Low 4 bytes.
   return sChipID;
 }
 #endif
@@ -198,6 +193,66 @@ uint8_t sensortype[MAX_SENSORS];
 
 /*****************************************************
  *
+ * Connect to WiFi - Use WiFiMulti for ESP32 because
+ * for some f***ing reason WiFi basic class just won't
+ *
+ *****************************************************/
+#if defined(ESP32)
+bool connect_wifi(void)
+{
+  SDEBUG_PRINTF("Connecting to %s", IOT_SSID);
+  WiFi.begin(IOT_SSID, IOT_PASSWORD);
+
+  int counter = 0;
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    // blinky(1);
+    delay(1000);
+    if (++counter > 15)
+    {
+      SDEBUG_PRINTF("\n====>>> Failed to connect to wifi :'(\nWiFi.status()=%d\n", WiFi.status());
+      return false;
+    }
+    SDEBUG_PRINT(".");
+  }
+
+  SDEBUG_PRINT("\nWiFi connected, IP address: ");
+  SDEBUG_PRINTLN(WiFi.localIP());
+#if defined(SERIAL_DEBUG)
+  SDEBUG_PRINTLN("===================================\nDiagnostics after connect:");
+  WiFi.printDiag(Serial);
+#endif
+
+  return true;
+}
+#elif defined(ESP8266)
+bool connect_wifi(void)
+{
+  SDEBUG_PRINTF("Connecting to %s", IOT_SSID);
+  // WiFi.disconnect();
+  WiFi.begin(IOT_SSID, IOT_PASSWORD);
+
+  int counter = 0;
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    // blinky(1);
+    delay(1000);
+    if (++counter > 15)
+    {
+      SDEBUG_PRINTF("\n====>>> Failed to connect to wifi :'(\nWiFi.status()=%d\n", WiFi.status());
+      return false;
+    }
+    SDEBUG_PRINT(".");
+  }
+
+  SDEBUG_PRINT("\nWiFi connected, IP address: ");
+  SDEBUG_PRINTLN(WiFi.localIP());
+  return true;
+}
+#endif
+
+/*****************************************************
+ *
  * MQTT subscription callback function
  *
  *****************************************************/
@@ -211,9 +266,6 @@ void setvar(String var)
   {
     sleepdur = value.toInt();
   }
-  // else if ( var == "valve1") {
-  // valve1 = value.toInt();
-  // }
   else if (var == "valvecount")
   {
     valvecount = value.toInt();
@@ -232,10 +284,10 @@ void setvar(String var)
   }
   else if (var.startsWith("valvestate"))
   {
-    int index = var.substring(12, 1).toInt();
+    int index = var.substring(strlen("valvestate") + 2, 1).toInt();
     valvestate[index] = value.toInt();
     SDEBUG_PRINTF("valvestate[%d] = <%d>\n", index, valvestate[index]);
-
+    // Can't do this - might have valvestate before valvepins
     // setvalve(index, OFF);
   }
   else if (var == "sensorcount")
@@ -300,22 +352,16 @@ void setup()
 
   Serial.begin(115200);
 
-  SDEBUG_PRINTLN(SKETCHVERS);
   SDEBUG_PRINTLN("============================================");
-  SDEBUG_PRINTLN("cid: " + cid + ", devid: " + devid + "\nVALVE1A = " + String(VALVE1A) + " VALVE1B = " + String(VALVE1B));
-
-  // setup 'barosensor'
-  // SDA = 4 = D2; SCL = 5 = D1
-  // Wire.begin(SDA, SCL);
-  // BaroSensor.begin();
-  //dht = new DHT;
-  //dhtp->begin();
+  SDEBUG_PRINTLN(SKETCHVERS);
+  SDEBUG_PRINTLN("cid: " + cid + ", devid: " + devid + "\n");
+  SDEBUG_PRINTLN("============================================");
 
   // MQTT initialise
   mqttclient.setCallback(mqttcallback);
 
   //  Connect to AP
-  if (connect_to_AP())
+  if (connect_wifi())
   {
     // request a device id (devid string)
     if (request_bind())
@@ -333,13 +379,6 @@ void setup()
       mqttclient.subscribe(("control/" + devid + "/#").c_str());
       mqttclient.subscribe(("persist/" + devid + "/set").c_str());
       mqttclient.publish("persist/fetch", devid.c_str());
-#ifdef NotBloodyLikely
-      mqttclient.subscribe(MQTT::Subscribe()
-                               .add_topic("control/" + devid + "/#", 1)
-                               .add_topic(, 1));
-      mqttclient.publish(MQTT::Publish("persist/fetch", devid)
-                             .set_qos(1));
-#endif
       SDEBUG_PRINT("Waiting for persistent variables...");
       two_second_pause();
     }
@@ -350,7 +389,7 @@ void setup()
   {
     SDEBUG_PRINTLN("Uh-oh, couldn't find the AP");
   }
-
+  mqttclient.disconnect();
   deep_sleep(sleepdur);
 }
 
@@ -410,6 +449,8 @@ void loop()
  ****************************************************/
 int request_bind()
 {
+  SDEBUG_PRINTF("wclient.connected(): %d\n",wclient.connected());
+  SDEBUG_PRINTF("mqttclient.state()=%d\n",mqttclient.state());
   if (!mqttclient.connected())
   {
     mqttclient.setServer(IPAddress(192, 168, MQTT_OCTET3, 1), 1883);
@@ -586,13 +627,13 @@ void read_sensors()
  * enter deep sleep for microseconds
  *
  ****************************************************/
-void deep_sleep(long microseconds)
+void deep_sleep(long seconds)
 {
-  SDEBUG_PRINTF("About to sleep for %ld microseconds...\n\n", microseconds);
+  SDEBUG_PRINTF("About to sleep for %ld seconds...\n\n", seconds);
 #if defined(ESP8266)
-  ESP.deepSleep(microseconds, WAKE_RF_DEFAULT); // Sleep for required time
+  ESP.deepSleep(1000000L*seconds, WAKE_RF_DEFAULT); // Sleep for required time
 #elif defined(ESP32)
-  ESP.deepSleep(microseconds);
+  ESP.deepSleep(1000000L*seconds);
 #endif
 }
 
@@ -687,6 +728,7 @@ void setvalve(int index, int state)
     digitalWrite(valvepin2[index], HIGH);
   }
 }
+#if defined(EXCLUDED_BY_DESIGN)
 /*****************************************************
  *
  * connect_to_AP
@@ -699,16 +741,20 @@ void setvalve(int index, int state)
 int connect_to_AP()
 {
   /* */
+  // char* ssid = (char*)IOT_SSID;
+  // const char* pswd = IOT_PASSWORD;
+  char *ssid = (char *)WIFI_SSID;
+  const char *pswd = WIFI_PWD;
+  SDEBUG_PRINTF("Connecting to %s", ssid);
 
-  SDEBUG_PRINTF("Connecting to %s", IOT_SSID);
-
-  WiFi.begin((char *)IOT_SSID, IOT_PASSWORD);
+  int wib = WiFi.begin(ssid, pswd);
+  SDEBUG_PRINTF("\nWiFi.begin returned [%d]\n", wib);
   int counter = 0;
   while (WiFi.status() != WL_CONNECTED)
   {
-    SDEBUG_PRINTF("[%d]",WiFi.status());
-    delay(1000);
-    if (++counter > 15)
+    SDEBUG_PRINTF("[%d]", WiFi.status());
+    delay(500);
+    if (++counter > 30)
       return FAILURE;
     SDEBUG_PRINT(".");
   }
@@ -718,3 +764,4 @@ int connect_to_AP()
 
   return SUCCESS;
 }
+#endif
