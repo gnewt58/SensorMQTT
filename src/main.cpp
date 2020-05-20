@@ -163,7 +163,7 @@ String cid(getChipId(sChipID));
 static char *getChipId(char *sChipID)
 {
   uint64_t chipid;
-  chipid = ESP.getEfuseMac();                  //The chip ID is essentially its MAC address(length: 6 bytes).
+  chipid = ESP.getEfuseMac();                                               //The chip ID is essentially its MAC address(length: 6 bytes).
   sprintf(sChipID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid); //print High 2 then Low 4 bytes.
   return sChipID;
 }
@@ -378,6 +378,9 @@ void setup()
       // All other subscriptions (and publishes) use device id
       mqttclient.subscribe(("control/" + devid + "/#").c_str());
       mqttclient.subscribe(("persist/" + devid + "/set").c_str());
+      // Respond with current "firmware" version
+      mqttclient.publish(("persist/set/" + devid).c_str(), (String("firmware=")+String(gitHEAD)).c_str());
+      // And then request all persistent variables back again
       mqttclient.publish("persist/fetch", devid.c_str());
       SDEBUG_PRINT("Waiting for persistent variables...");
       two_second_pause();
@@ -449,8 +452,8 @@ void loop()
  ****************************************************/
 int request_bind()
 {
-  SDEBUG_PRINTF("wclient.connected(): %d\n",wclient.connected());
-  SDEBUG_PRINTF("mqttclient.state()=%d\n",mqttclient.state());
+  SDEBUG_PRINTF("wclient.connected(): %d\n", wclient.connected());
+  SDEBUG_PRINTF("mqttclient.state()=%d\n", mqttclient.state());
   if (!mqttclient.connected())
   {
     mqttclient.setServer(IPAddress(192, 168, MQTT_OCTET3, 1), 1883);
@@ -631,9 +634,9 @@ void deep_sleep(long seconds)
 {
   SDEBUG_PRINTF("About to sleep for %ld seconds...\n\n", seconds);
 #if defined(ESP8266)
-  ESP.deepSleep(1000000L*seconds, WAKE_RF_DEFAULT); // Sleep for required time
+  ESP.deepSleep(1000000L * seconds, WAKE_RF_DEFAULT); // Sleep for required time
 #elif defined(ESP32)
-  ESP.deepSleep(1000000L*seconds);
+  ESP.deepSleep(1000000L * seconds);
 #endif
 }
 
