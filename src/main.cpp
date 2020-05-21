@@ -300,7 +300,7 @@ void setvar(String var)
     int index = var.substring(11, 12).toInt();
     strncpy(sensorpins[index], value.c_str(), MAX_PINSTRINGLENGTH);
     sensorpins[index][MAX_PINSTRINGLENGTH - 1] = '\0'; // ensure a terminated c_string
-    SDEBUG_PRINTF("%d:sensorpins[%d] = '%d'\n", __LINE__, index, sensorpins[index]);
+    SDEBUG_PRINTF("%d:sensorpins[%d] = '%s'\n", __LINE__, index, sensorpins[index]);
   }
   else if (var.startsWith("sensortype"))
   {
@@ -379,7 +379,8 @@ void setup()
       mqttclient.subscribe(("control/" + devid + "/#").c_str());
       mqttclient.subscribe(("persist/" + devid + "/set").c_str());
       // Respond with current "firmware" version
-      mqttclient.publish(("persist/set/" + devid).c_str(), (String("firmware=")+String(gitHEAD)).c_str());
+      mqttclient.publish(("persist/set/" + devid).c_str(), (String("firmware=") + String(gitHEAD)).c_str());
+      mqttclient.publish(("persist/set/" + devid).c_str(), (String("buildtime=") + __DATE__ + " " + __TIME__).c_str());
       // And then request all persistent variables back again
       mqttclient.publish("persist/fetch", devid.c_str());
       SDEBUG_PRINT("Waiting for persistent variables...");
@@ -523,7 +524,9 @@ void read_sensors()
       if (mqttclient.connected())
       {
         /* Unclear if this is blocking or non-blocking */
-        delay(2500); // for DHT sensor
+        two_second_pause();
+        two_second_pause();
+        // delay(2500); // for DHT sensor
         // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
         float h = dhtp->readHumidity();
         // Read temperature as Celsius (the default)
@@ -533,7 +536,8 @@ void read_sensors()
         while ((isnan(h) || isnan(t)) && retries--)
         {
           SDEBUG_PRINTLN("Failed to read from DHT sensor!");
-          delay(2100);
+          two_second_pause();
+          // delay(2100);
           h = dhtp->readHumidity();
           t = dhtp->readTemperature();
         }
@@ -545,8 +549,11 @@ void read_sensors()
         {
           SDEBUG_PRINTF("Humidity: %f %  Temperature: %f *C\n", h, t);
           // Hierarchy is sensors/<deviceid>/<sensorid>/<parameter>
+          two_second_pause();
           mqttclient.publish(("sensors/" + devid + "/DHT" + String(sensortype[i]) + "-T/degC").c_str(), String(t).c_str());
+          two_second_pause();
           mqttclient.publish(("sensors/" + devid + "/DHT" + String(sensortype[i]) + "-RH/%").c_str(), String(h).c_str());
+          two_second_pause();
         }
         mqttclient.loop();
       }
@@ -554,8 +561,9 @@ void read_sensors()
     else if (sensortype[i] == ONEWIRETYPE)
     {
       SDEBUG_PRINT(" One wire type on pin ");
-      SDEBUG_PRINTLN(sensorpins[i]);
+      SDEBUG_PRINTLN(atoi(sensorpins[i]));
       oneWirep = new OneWire(atoi(sensorpins[i]));
+
       // All 1-Wire sensors...
       byte oneWireCount = discoverOneWireDevices();
       DallasTemperature DSTemp(oneWirep);
