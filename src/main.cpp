@@ -89,6 +89,7 @@ static const uint8_t SD2 = 9;
 static const uint8_t SD3 = 10;
 #define ONE_WIRE_BUS SD3 // DS18B20 pin (SD3 on NodeMCU Devkit = GPIO 10)
 //#define ONE_WIRE_BUS D4 // DS18B20 pin (D4 on NodeMCU Devkit = GPIO 2)
+#define MAX_ONEWIRE_DEVICES 5
 
 /**
  * Sensor type definitions. DHT11 = 11, DHT21 = 21, DHT22 = 22 as per dht.h
@@ -131,8 +132,8 @@ DHT *dhtp;
  *
  *****************************************************/
 // 1-Wire setup
-//OneWire oneWire(ONE_WIRE_BUS);
-OneWire *oneWirep;
+//OneWire oneWire(ONE_WIRE_BUS); now connect to bus when we know which pin
+OneWire oneWire;
 
 //DallasTemperature DS18B20(&oneWire);
 
@@ -191,10 +192,10 @@ int sensorcount = 0;
 char sensorpins[MAX_SENSORS][MAX_PINSTRINGLENGTH];
 uint8_t sensortype[MAX_SENSORS];
 
+DallasTemperature DSTemp;
 /*****************************************************
  *
- * Connect to WiFi - Use WiFiMulti for ESP32 because
- * for some f***ing reason WiFi basic class just won't
+ * Connect to WiFi 
  *
  *****************************************************/
 #if defined(ESP32)
@@ -434,6 +435,20 @@ void two_second_pause()
 
 /*****************************************************
  *
+ * print_onewire_address
+ *
+ * Print the bytes of a OneWire address
+ *
+ *****************************************************/
+void print_onewire_address(byte *addr)
+{
+  SDEBUG_PRINTF("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
+                addr[0], addr[1], addr[2], addr[3],
+                addr[4], addr[5], addr[6], addr[7]);
+}
+
+/*****************************************************
+ *
  * loop
  *
  *****************************************************/
@@ -483,23 +498,6 @@ void read_sensors()
 {
   SDEBUG_PRINTLN("read_sensors");
   float temp = -127.0;
-#ifdef NotBloodyLikely
-  // Connect to mqtt if not already connected
-  if (!mqttclient.connected())
-  {
-    if (!mqttclient.connect(MQTT::Connect("Client" + devid)
-                                /*.set_clean_session() */
-                                /*.set_will("status", "down") */
-                                .set_auth("ESP8266", "I am your father")
-                            /*.set_keepalive(30) */
-                            ))
-    {
-      // If we can't connect to the mqtt broker, there's no point reading sensors
-      SDEBUG_PRINTLN("Failed to connect to mqtt broker");
-      return;
-    }
-  }
-#endif
 
   /*** This assumes we're not using analogue input pin for an actual sensor ***/
   //  if (mqttclient.connected()) {
@@ -523,19 +521,17 @@ void read_sensors()
       ///
       if (mqttclient.connected())
       {
-        /* Unclear if this is blocking or non-blocking */
-        two_second_pause();
-        two_second_pause();
-        // delay(2500); // for DHT sensor
+        two_second_pause(); // for DHT sensor
         // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
         float h = dhtp->readHumidity();
         // Read temperature as Celsius (the default)
         float t = dhtp->readTemperature();
-        // Check if any reads failed and exit early (to try again).
-        byte retries = 4;
+// Check if any reads failed and exit early (to try again).
+#define MAX_DHT_RETRIES 4
+        byte retries = MAX_DHT_RETRIES;
         while ((isnan(h) || isnan(t)) && retries--)
         {
-          SDEBUG_PRINTLN("Failed to read from DHT sensor!");
+          SDEBUG_PRINTF("Failed to read from DHT sensor %d time(s)!", MAX_DHT_RETRIES - retries);
           two_second_pause();
           // delay(2100);
           h = dhtp->readHumidity();
@@ -547,11 +543,13 @@ void read_sensors()
         }
         else
         {
-          SDEBUG_PRINTF("Humidity: %f %  Temperature: %f *C\n", h, t);
+          SDEBUG_PRINTF("Humidity: %f%%  Temperature: %f°C\n", h, t);
           // Hierarchy is sensors/<deviceid>/<sensorid>/<parameter>
           two_second_pause();
+          SDEBUG_PRINTLN("Publishing temperature");
           mqttclient.publish(("sensors/" + devid + "/DHT" + String(sensortype[i]) + "-T/degC").c_str(), String(t).c_str());
           two_second_pause();
+          SDEBUG_PRINTLN("Publishing humidity");
           mqttclient.publish(("sensors/" + devid + "/DHT" + String(sensortype[i]) + "-RH/%").c_str(), String(h).c_str());
           two_second_pause();
         }
@@ -562,11 +560,10 @@ void read_sensors()
     {
       SDEBUG_PRINT(" One wire type on pin ");
       SDEBUG_PRINTLN(atoi(sensorpins[i]));
-      oneWirep = new OneWire(atoi(sensorpins[i]));
+      oneWire.begin(atoi(sensorpins[i]));
 
       // All 1-Wire sensors...
       byte oneWireCount = discoverOneWireDevices();
-      DallasTemperature DSTemp(oneWirep);
       DSTemp.requestTemperatures();
       for (byte i = 0; i < oneWireCount; i++)
       {
@@ -583,7 +580,7 @@ void read_sensors()
         if (mqttclient.connected())
         {
           mqttclient.publish(("sensors/" + devid + "/DS" + i + "-T/degC").c_str(), String(temp).c_str());
-          mqttclient.loop();
+          two_second_pause();
         }
       }
     }
@@ -657,40 +654,25 @@ void deep_sleep(long seconds)
  ****************************************************/
 byte discoverOneWireDevices(void)
 {
-  byte i;
-  byte devcount = 0;
-  // byte present = 0;
-  // byte data[12];
-  byte addr[8];
+  uint8_t devcount = 0;
+  DeviceAddress addr[MAX_ONEWIRE_DEVICES];
+
+  DSTemp.setOneWire(&oneWire);
+  DSTemp.begin();
 
   SDEBUG_PRINT("Looking for 1-Wire devices...\n\r");
-  oneWirep->reset_search();
-  while (oneWirep->search(addr))
+  oneWire.reset_search();
+  while (oneWire.search(addr[devcount]))
   {
-    devcount++;
     SDEBUG_PRINT("\n\rFound \'1-Wire\' device with address: ");
-    for (i = 0; i < 8; i++)
+    print_onewire_address(addr[devcount]);
+    if (!DSTemp.validAddress(addr[devcount]))
     {
-      if (addr[i] < 16)
-      {
-        SDEBUG_PRINT('0');
-      }
-      SDEBUG_PRINT(addr[i], HEX);
-      if (i < 7)
-      {
-        SDEBUG_PRINT(":");
-      }
-      else
-      {
-        SDEBUG_PRINTLN("");
-      }
+      SDEBUG_PRINT("Address ");
+      print_onewire_address(addr[devcount]);
+      SDEBUG_PRINTLN(" is not valid!");
     }
-    if (OneWire::crc8(addr, 7) != addr[7])
-    {
-      SDEBUG_PRINT("CRC is not valid!\n");
-      //==>>> return;
-    }
-    switch (addr[0])
+    switch (addr[devcount][0])
     {
     case DS18S20MODEL:
       SDEBUG_PRINTLN("Temp sensor DS18S20 found");
@@ -708,9 +690,13 @@ byte discoverOneWireDevices(void)
       SDEBUG_PRINTLN("Device does not appear to be a known type temperature sensor.");
       break;
     }
+    if (++devcount > MAX_ONEWIRE_DEVICES)
+    {
+      return devcount;
+    }
   }
 
-  oneWirep->reset_search();
+  oneWire.reset_search();
   return devcount;
 }
 
@@ -739,40 +725,4 @@ void setvalve(int index, int state)
     digitalWrite(valvepin2[index], HIGH);
   }
 }
-#if defined(EXCLUDED_BY_DESIGN)
-/*****************************************************
- *
- * connect_to_AP
- *
- * What it says on the box, connects  to
- * predefined AP, returns SUCCESS or
- * FAILURE after maximum 15 seconds (30 x 500ms)
- *
- ****************************************************/
-int connect_to_AP()
-{
-  /* */
-  // char* ssid = (char*)IOT_SSID;
-  // const char* pswd = IOT_PASSWORD;
-  char *ssid = (char *)WIFI_SSID;
-  const char *pswd = WIFI_PWD;
-  SDEBUG_PRINTF("Connecting to %s", ssid);
-
-  int wib = WiFi.begin(ssid, pswd);
-  SDEBUG_PRINTF("\nWiFi.begin returned [%d]\n", wib);
-  int counter = 0;
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    SDEBUG_PRINTF("[%d]", WiFi.status());
-    delay(500);
-    if (++counter > 30)
-      return FAILURE;
-    SDEBUG_PRINT(".");
-  }
-
-  SDEBUG_PRINT("\nWiFi connected, IP address: ");
-  SDEBUG_PRINTLN(WiFi.localIP());
-
-  return SUCCESS;
-}
-#endif
+//////////////////////// EOF /////////////////////////////
