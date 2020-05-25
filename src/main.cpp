@@ -106,7 +106,7 @@ IPAddress mqttserver(192, 168, MQTT_OCTET3, 1);
  * Utility macros
  *
  *****************************************************/
-#define ONEMINUTE 60000000
+#define ONEMINUTE 60
 #define FAILURE 0
 #define SUCCESS (!FAILURE)
 #define BUFFER_SIZE 100
@@ -382,6 +382,7 @@ void setup()
       // Respond with current "firmware" version
       mqttclient.publish(("persist/set/" + devid).c_str(), (String("firmware=") + String(gitHEAD)).c_str());
       mqttclient.publish(("persist/set/" + devid).c_str(), (String("buildtime=") + __DATE__ + " " + __TIME__).c_str());
+      mqttclient.publish(("persist/set/" + devid).c_str(), (String("ip=") + WiFi.localIP.toString()).c_str());
       // And then request all persistent variables back again
       mqttclient.publish("persist/fetch", devid.c_str());
       SDEBUG_PRINT("Waiting for persistent variables...");
