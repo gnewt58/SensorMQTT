@@ -379,10 +379,10 @@ void setup()
       // All other subscriptions (and publishes) use device id
       mqttclient.subscribe(("control/" + devid + "/#").c_str());
       mqttclient.subscribe(("persist/" + devid + "/set").c_str());
-      // Respond with current "firmware" version
-      mqttclient.publish(("persist/set/" + devid).c_str(), (String("firmware=") + String(gitHEAD)).c_str());
-      mqttclient.publish(("persist/set/" + devid).c_str(), (String("buildtime=") + __DATE__ + " " + __TIME__).c_str());
-      mqttclient.publish(("persist/set/" + devid).c_str(), (String("ip=") + WiFi.localIP.toString()).c_str());
+      // Save current status (firmware, buildtime, ip)
+      mqttclient.publish(("status/" + devid).c_str(), (String("firmware=") + String(gitHEAD)).c_str());
+      mqttclient.publish(("status/" + devid).c_str(), (String("buildtime=") + __DATE__ + " " + __TIME__).c_str());
+      mqttclient.publish(("status/" + devid).c_str(), (String("ip=") + WiFi.localIP().toString()).c_str());
       // And then request all persistent variables back again
       mqttclient.publish("persist/fetch", devid.c_str());
       SDEBUG_PRINT("Waiting for persistent variables...");
