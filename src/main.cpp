@@ -94,9 +94,18 @@ static const uint8_t SD3 = 10;
 /**
  * Sensor type definitions. DHT11 = 11, DHT21 = 21, DHT22 = 22 as per dht.h
  */
-#define ONEWIRETYPE 1 // Not 11 or 21 or 22
-#define BAROTYPE 2
-#define SOIL 3
+#define SENSORONEWIRE 1 // Not 11 or 21 or 22
+#define SENSORBARO 2
+#define SENSORSOIL 3
+#define SENSORVCC 4
+#if defined(ESP8266)
+// There has to be a better way? Maybe do this in the SENSORVCC part?
+// ...nope. Must be "outside function context"
+ADC_MODE(ADC_VCC);
+#endif
+//#define DHT11 11
+//#define DHT21 21
+//#define DHT22 22
 
 // pringlei hostap at 192.168.42.1
 IPAddress mqttserver(192, 168, MQTT_OCTET3, 1);
@@ -314,16 +323,16 @@ void setvar(String var)
 
 void mqttcallback(char *topic, byte *payload, unsigned int length)
 {
+  // Convert possibly unterminated payload to string
   String pstring;
   for (unsigned int i = 0; i < length; i++)
   {
     pstring = pstring + (char)payload[i];
   }
-  SDEBUG_PRINTF("Topic: [%s], bind/<cid>: [%s], payload: [%s]\n", topic, ("bind/" + cid).c_str(), pstring.c_str());
+  SDEBUG_PRINTF("%s:%d Topic: [%s], bind/<cid>: [%s], payload: [%s]\n", __FILE__,__LINE__,topic, ("bind/" + cid).c_str(), pstring.c_str());
   // Process bind response, setting device ID appropriately
   if (!strcmp(topic, ("bind/" + cid).c_str()))
   {
-    SDEBUG_PRINT("Careful with these payloads - not null terminated!!!")
     devid = pstring;
     SDEBUG_PRINTF("devid=%s\n", devid.c_str());
   }
@@ -425,6 +434,7 @@ void control_valves()
 void two_second_pause()
 {
   byte retries = 40;
+  SDEBUG_PRINT(" 2SP:")
   while (--retries)
   {
     delay(50);
@@ -557,7 +567,7 @@ void read_sensors()
         mqttclient.loop();
       }
     }
-    else if (sensortype[i] == ONEWIRETYPE)
+    else if (sensortype[i] == SENSORONEWIRE)
     {
       SDEBUG_PRINT(" One wire type on pin ");
       SDEBUG_PRINTLN(atoi(sensorpins[i]));
@@ -585,7 +595,7 @@ void read_sensors()
         }
       }
     }
-    else if (sensortype[i] == BAROTYPE)
+    else if (sensortype[i] == SENSORBARO)
     {
       char *pintok, *strtokk;
       // Split sensorpins to get SDA and SCL separately
@@ -597,6 +607,7 @@ void read_sensors()
       SDEBUG_PRINTLN("Wire.begin(" + String(sdapin) + "," + String(sclpin) + ");");
       Wire.begin(sdapin, sclpin);
       BaroSensor.begin();
+      two_second_pause();
       if (mqttclient.connected())
       {
         if (!BaroSensor.isOK())
@@ -613,24 +624,40 @@ void read_sensors()
           SDEBUG_PRINTLN(BaroSensor.getPressure());
           // Hierarchy is sensors/<deviceid>/<sensorid>/<parameter>
           mqttclient.publish(("sensors/" + devid + "/baro-T/degC").c_str(), String(BaroSensor.getTemperature()).c_str());
+          two_second_pause();
           mqttclient.publish(("sensors/" + devid + "/baro-p/mbar").c_str(), String(BaroSensor.getPressure()).c_str());
-          mqttclient.loop();
+          two_second_pause();
         }
       }
     }
-    else if (sensortype[i] == SOIL)
+#if defined(ESP8266)
+    // unfortunately incompatible with any analogue read of the ADC. 
+    // If built in firmware cannot use analogue sensors.
+    else if (sensortype[i] == SENSORVCC)
+    {
+      SDEBUG_PRINTLN("publishing VCC..." + String(ESP.getVcc()));
+      if (mqttclient.connected())
+      {
+        two_second_pause();
+        mqttclient.publish(("sensors/" + devid + "/ESPVCC/mV").c_str(), String(ESP.getVcc()).c_str());
+        two_second_pause();
+      }
+    }
+#endif
+    else if (sensortype[i] == SENSORSOIL)
     {
       int output_value;
       output_value = analogRead(atoi(sensorpins[i]));
       //      output_value = map(output_value,550,0,0,100);
-      SDEBUG_PRINTF("Soil moisture sensor raw read: %d\n", output_value);
+      SDEBUG_PRINTF("SENSORSOIL moisture sensor raw read: %d\n", output_value);
       // Hierarchy is sensors/<deviceid>/<sensorid>/<parameter>
-      //    mqttclient.publish(("sensors/" + devid + "/soil-T/degC").c_str(), String(BaroSensor.getTemperature()).c_str());
+      //    mqttclient.publish(("sensors/" + devid + "/SENSORSOIL-T/degC").c_str(), String(BaroSensor.getTemperature()).c_str());
       //                        );
       //      mqttclient.loop();
     }
   }
 }
+
 /*****************************************************
  *
  * enter deep sleep for microseconds
