@@ -28,11 +28,11 @@ class WiFiMulti WiFiMulti;
  * Customisation section
  *
  *****************************************************/
-#define SKETCHVERS "v.20200519"
 
 #include "private-data.h"
 #include "SensorMQTT.hpp"
 #include "gitversion.h"
+#define SKETCHVERS ("v." __DATE__)
 
 #ifdef SERIAL_DEBUG
 // Get DHT debugging messages, except this didn't work
@@ -329,7 +329,7 @@ void mqttcallback(char *topic, byte *payload, unsigned int length)
   {
     pstring = pstring + (char)payload[i];
   }
-  SDEBUG_PRINTF("%s:%d Topic: [%s], bind/<cid>: [%s], payload: [%s]\n", __FILE__,__LINE__,topic, ("bind/" + cid).c_str(), pstring.c_str());
+  SDEBUG_PRINTF("%s:%d Topic: [%s], bind/<cid>: [%s], payload: [%s]\n", __FILE__, __LINE__, topic, ("bind/" + cid).c_str(), pstring.c_str());
   // Process bind response, setting device ID appropriately
   if (!strcmp(topic, ("bind/" + cid).c_str()))
   {
@@ -520,6 +520,16 @@ void read_sensors()
   //    mqttclient.loop();
   //  }
 
+  /***************************************************************
+   * send RSSI always
+   ***************************************************************/
+  if (mqttclient.connected())
+  {
+    two_second_pause(); // for DHT sensor
+    int32_t rssi = WiFi.RSSI();
+    SDEBUG_PRINTF("Publishing RSSI: %d\n", rssi);
+    mqttclient.publish(("sensors/" + devid + "/RSSI/dBm").c_str(), String(rssi).c_str());
+  }
   for (int i = 0; i < sensorcount; i++)
   {
     SDEBUG_PRINTLN("sensortype[" + String(i) + "]=<" + String(sensortype[i]) + ">");
@@ -631,7 +641,7 @@ void read_sensors()
       }
     }
 #if defined(ESP8266)
-    // unfortunately incompatible with any analogue read of the ADC. 
+    // unfortunately incompatible with any analogue read of the ADC.
     // If built in firmware cannot use analogue sensors.
     else if (sensortype[i] == SENSORVCC)
     {
