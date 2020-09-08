@@ -9,5 +9,6 @@ void deep_sleep(long);
 void setvalve(int index, int state);
 int connect_to_AP(void);
 byte discoverOneWireDevices(void);
+void send_error(String err);
 
 #endif // _SENSORMQTT_H_

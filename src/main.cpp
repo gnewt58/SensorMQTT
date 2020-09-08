@@ -3,7 +3,7 @@
  *
  */
 // Comment this out to strip all debugging messages
-//#define SERIAL_DEBUG true
+#define SERIAL_DEBUG true
 #include "serial-debug.h"
 #include <Arduino.h>
 
@@ -94,14 +94,10 @@ static const uint8_t SD3 = 10;
 /**
  * Sensor type definitions. DHT11 = 11, DHT21 = 21, DHT22 = 22 as per dht.h
  */
-#define SENSORONEWIRE 1 // Not 11 or 21 or 22
-#define SENSORBARO 2
-#define SENSORSOIL 3
-#define SENSORVCC 4
+#include "sensor_types.h"
+
 #if defined(ESP8266)
-// There has to be a better way? Maybe do this in the SENSORVCC part?
-// ...nope. Must be "outside function context"
-ADC_MODE(ADC_VCC);
+ADC_MODE(ADC_TOUT);
 #endif
 //#define DHT11 11
 //#define DHT21 21
@@ -200,6 +196,8 @@ int valvecount = 0;
 int sensorcount = 0;
 char sensorpins[MAX_SENSORS][MAX_PINSTRINGLENGTH];
 uint8_t sensortype[MAX_SENSORS];
+int adc_divisor = 1;
+int adc_offset = 0;
 
 DallasTemperature DSTemp;
 /*****************************************************
@@ -319,6 +317,14 @@ void setvar(String var)
     sensortype[index] = value.toInt();
     SDEBUG_PRINTF("sensortype[%d] = '%d'\n", index, sensortype[index]);
   }
+  else if (var == "adc_divisor")
+  {
+    adc_divisor = value.toInt();
+  }
+  else if (var == "adc_offset")
+  {
+    adc_offset = value.toInt();
+  }
 }
 
 void mqttcallback(char *topic, byte *payload, unsigned int length)
@@ -395,7 +401,7 @@ void setup()
       // And then request all persistent variables back again
       mqttclient.publish("persist/fetch", devid.c_str());
       SDEBUG_PRINT("Waiting for persistent variables...");
-      two_second_pause();
+      brief_pause();
     }
     control_valves();
     read_sensors();
@@ -426,15 +432,16 @@ void control_valves()
 
 /*****************************************************
  *
- * two_second_pause
+ * brief_pause
  *
- * Do an mqtt loop 40 times at 50ms intervals
+ * Do an mqtt loop 10 times at 50ms intervals 
+ * to give 1/2 second pause
  *
  *****************************************************/
-void two_second_pause()
+void brief_pause()
 {
-  byte retries = 40;
-  SDEBUG_PRINT(" 2SP:")
+  byte retries = 10;
+  SDEBUG_PRINT(" BP:")
   while (--retries)
   {
     delay(50);
@@ -502,6 +509,19 @@ int request_bind()
 
 /*****************************************************
  *
+ * send_error
+ *
+ ****************************************************/
+void send_error( String err )
+{
+  SDEBUG_PRINTLN(err);
+  if (mqttclient.connected())
+  {
+      mqttclient.publish(("status/" + devid).c_str(), String("error="+err).c_str() );
+  }
+}
+/*****************************************************
+ *
  * read_sensors
  *
  ****************************************************/
@@ -525,7 +545,7 @@ void read_sensors()
    ***************************************************************/
   if (mqttclient.connected())
   {
-    two_second_pause(); // for DHT sensor
+    brief_pause(); // for DHT sensor
     int32_t rssi = WiFi.RSSI();
     SDEBUG_PRINTF("Publishing RSSI: %d\n", rssi);
     mqttclient.publish(("sensors/" + devid + "/RSSI/dBm").c_str(), String(rssi).c_str());
@@ -542,7 +562,7 @@ void read_sensors()
       ///
       if (mqttclient.connected())
       {
-        two_second_pause(); // for DHT sensor
+        brief_pause(); // for DHT sensor
         // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
         float h = dhtp->readHumidity();
         // Read temperature as Celsius (the default)
@@ -552,30 +572,51 @@ void read_sensors()
         byte retries = MAX_DHT_RETRIES;
         while ((isnan(h) || isnan(t)) && retries--)
         {
-          SDEBUG_PRINTF("Failed to read from DHT sensor %d time(s)!", MAX_DHT_RETRIES - retries);
-          two_second_pause();
+          send_error( String("Failed to read from DHT sensor ")+String(MAX_DHT_RETRIES - retries)+String(" time(s)!") );
+          brief_pause();
           // delay(2100);
           h = dhtp->readHumidity();
           t = dhtp->readTemperature();
         }
         if (isnan(h) || isnan(t))
         {
-          SDEBUG_PRINTLN("DHT is a pain in the backside");
+          send_error(String("DHT returned NAN"));
         }
         else
         {
           SDEBUG_PRINTF("Humidity: %f%%  Temperature: %f°C\n", h, t);
           // Hierarchy is sensors/<deviceid>/<sensorid>/<parameter>
-          two_second_pause();
+          brief_pause();
           SDEBUG_PRINTLN("Publishing temperature");
           mqttclient.publish(("sensors/" + devid + "/DHT" + String(sensortype[i]) + "-T/degC").c_str(), String(t).c_str());
-          two_second_pause();
+          brief_pause();
           SDEBUG_PRINTLN("Publishing humidity");
           mqttclient.publish(("sensors/" + devid + "/DHT" + String(sensortype[i]) + "-RH/%").c_str(), String(h).c_str());
-          two_second_pause();
+          brief_pause();
         }
         mqttclient.loop();
       }
+    }
+    else if (sensortype[i] == SENSORADC)
+    {
+      float avgread = 0.0;
+      // Bang out 100 quick reads, and average them
+      for(int i = 0; i < 100; i++)
+        avgread = avgread+analogRead( String( sensorpins[i] ).toInt() );
+      avgread = avgread/100.0;
+      // Now offset and scale...
+      SDEBUG_PRINTF("Raw average ADC: %f", avgread);
+      avgread = avgread - adc_offset;
+      SDEBUG_PRINTF("Offset average ADC: %f", avgread);
+      avgread = avgread / adc_divisor;
+      SDEBUG_PRINTF("Scaled average ADC: %f", avgread);
+      if (mqttclient.connected())
+      {
+          SDEBUG_PRINTLN("Publishing ADC");
+          mqttclient.publish(("sensors/" + devid + "/ADC/V").c_str(), String(avgread,2).c_str());
+          brief_pause();
+      }
+      // send_error("SENSORADC part isn't written yet");
     }
     else if (sensortype[i] == SENSORONEWIRE)
     {
@@ -601,7 +642,7 @@ void read_sensors()
         if (mqttclient.connected())
         {
           mqttclient.publish(("sensors/" + devid + "/DS" + i + "-T/degC").c_str(), String(temp).c_str());
-          two_second_pause();
+          brief_pause();
         }
       }
     }
@@ -617,7 +658,7 @@ void read_sensors()
       SDEBUG_PRINTLN("Wire.begin(" + String(sdapin) + "," + String(sclpin) + ");");
       Wire.begin(sdapin, sclpin);
       BaroSensor.begin();
-      two_second_pause();
+      brief_pause();
       if (mqttclient.connected())
       {
         if (!BaroSensor.isOK())
@@ -634,9 +675,9 @@ void read_sensors()
           SDEBUG_PRINTLN(BaroSensor.getPressure());
           // Hierarchy is sensors/<deviceid>/<sensorid>/<parameter>
           mqttclient.publish(("sensors/" + devid + "/baro-T/degC").c_str(), String(BaroSensor.getTemperature()).c_str());
-          two_second_pause();
+          brief_pause();
           mqttclient.publish(("sensors/" + devid + "/baro-p/mbar").c_str(), String(BaroSensor.getPressure()).c_str());
-          two_second_pause();
+          brief_pause();
         }
       }
     }
@@ -648,9 +689,9 @@ void read_sensors()
       SDEBUG_PRINTLN("publishing VCC..." + String(ESP.getVcc()));
       if (mqttclient.connected())
       {
-        two_second_pause();
+        brief_pause();
         mqttclient.publish(("sensors/" + devid + "/ESPVCC/mV").c_str(), String(ESP.getVcc()).c_str());
-        two_second_pause();
+        brief_pause();
       }
     }
 #endif
@@ -660,10 +701,12 @@ void read_sensors()
       output_value = analogRead(atoi(sensorpins[i]));
       //      output_value = map(output_value,550,0,0,100);
       SDEBUG_PRINTF("SENSORSOIL moisture sensor raw read: %d\n", output_value);
-      // Hierarchy is sensors/<deviceid>/<sensorid>/<parameter>
-      //    mqttclient.publish(("sensors/" + devid + "/SENSORSOIL-T/degC").c_str(), String(BaroSensor.getTemperature()).c_str());
-      //                        );
-      //      mqttclient.loop();
+      if (mqttclient.connected())
+      {
+        brief_pause();
+        mqttclient.publish(("sensors/" + devid + "/Soil/moistnesses").c_str(), String(output_value).c_str());
+        brief_pause();
+      }
     }
   }
 }
