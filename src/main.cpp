@@ -3,7 +3,7 @@
  *
  */
 // Comment this out to strip all debugging messages
-#define SERIAL_DEBUG true
+//#define SERIAL_DEBUG true
 #include "serial-debug.h"
 #include <Arduino.h>
 

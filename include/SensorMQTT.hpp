@@ -1,7 +1,7 @@
 #ifndef _SENSORMQTT_HPP_
 #define _SENSORMQTT_HPP_
 
-void two_second_pause(void);
+void brief_pause(void);
 int request_bind(void);
 void control_valves(void);
 void read_sensors(void);
