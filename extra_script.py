@@ -2,12 +2,13 @@ Import("env", "projenv")
 
 # access to global build environment
 print("env: ")
-print(env)
+print(env.Dump())
 
 # access to project build environment (is used source files in "src" folder)
 print("projenv: ")
-print(projenv)
-
+print(projenv.Dump())
+print("------------------------------------------")
+print("dollaSOURCE=$SOURCE")
 #
 # Dump build environment (for debug purpose)
 # print("env.Dump(): ",env.Dump())
@@ -23,32 +24,37 @@ print(projenv)
 # Upload actions
 #
 
-def before_upload(source, target, env):
-    print("before_upload]\nsource: ")
+def before_buildprog(source, target, env):
+    print("before_buildprog]\nsource: ")
     print(source) 
     print(" target: ")
     print(target)
     print(" env: ")
-    print(env)
+    print(env.Dump())
     # do some actions
 
     # call Node.JS or other script
     # env.Execute("node --version")
 
 
-def after_upload(source, target, env):
-    print("---after_upload---\nsource: ")
+def after_buildprog(source, target, env):
+    print("---after_buildprog---\nsource:\n----------------- ")
     print(source) 
-    print(" target: ")
+    print("-----------------\n target:\n----------------- ")
     print(target)
-    print(" env: ")
-    print(env)
+    print("-----------------\n env:\n-----------------")
+    print(env.Dump())
     # do some actions
 
-print("Current build targets", map(str, BUILD_TARGETS))
+# print("Current build targets:")
+# print(list(map(str, BUILD_TARGETS)))
+# print("Board: ")
+# print(BOARD)
+# for k, v in btmap.iter():
+#     print( k, v )
 
-env.AddPreAction("buildprog", before_upload)
-env.AddPostAction("buildprog", after_upload)
+env.AddPreAction("buildprog", before_buildprog)
+env.AddPostAction("buildprog", after_buildprog)
 
 #
 # Custom actions when building program/firmware

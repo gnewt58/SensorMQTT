@@ -41,7 +41,8 @@ class WiFiMulti WiFiMulti;
 #define DHT_DEBUG
 #endif
 #include <DHT.h>
-
+#pragma message("FIRMWARE_RELEASE: ")
+#pragma message(FIRMWARE_RELEASE)
 // Pins to avoid! ESP8266
 /****************************************************
  * GPIO  0 -> D3  used for program mode
