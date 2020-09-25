@@ -10,5 +10,5 @@ void setvalve(int index, int state);
 int connect_to_AP(void);
 byte discoverOneWireDevices(void);
 void send_error(String err);
-
+const char* buildENV = BUILD_ENV_NAME;
 #endif // _SENSORMQTT_H_

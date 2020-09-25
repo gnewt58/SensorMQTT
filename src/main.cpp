@@ -41,8 +41,6 @@ class WiFiMulti WiFiMulti;
 #define DHT_DEBUG
 #endif
 #include <DHT.h>
-#pragma message("FIRMWARE_RELEASE: ")
-#pragma message(FIRMWARE_RELEASE)
 // Pins to avoid! ESP8266
 /****************************************************
  * GPIO  0 -> D3  used for program mode
@@ -372,6 +370,10 @@ void setup()
   SDEBUG_PRINTLN("============================================");
   SDEBUG_PRINTLN(SKETCHVERS);
   SDEBUG_PRINTLN("cid: " + cid + ", devid: " + devid + "\n");
+  SDEBUG_PRINT("PIO_ENV: ");
+  SDEBUG_PRINT(buildENV);
+  SDEBUG_PRINT(", GIT: ");
+  SDEBUG_PRINTLN(gitHEAD);
   SDEBUG_PRINTLN("============================================");
 
   // MQTT initialise
