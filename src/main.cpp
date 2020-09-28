@@ -10,10 +10,15 @@
 // #include <MQTT.h>
 #if defined(ESP32)
 #include <WiFi.h>
-#include <WiFiMulti.h>
-class WiFiMulti WiFiMulti;
+// #include <WiFiMulti.h>
+// class WiFiMulti WiFiMulti;
+#include <HTTPClient.h>
+#include <HTTPUpdate.h>
 #elif defined(ESP8266)
 #include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
+#define httpUpdate ESPhttpUpdate
 #endif
 #include <SPI.h>
 #include <PubSubClient.h>
@@ -160,6 +165,49 @@ char sChipID[13];
 static char *getChipId(char *);
 String cid(getChipId(sChipID));
 
+
+/****************************************************
+ * 
+ * OTA function
+ * 
+ ****************************************************/
+t_httpUpdate_return try_OTA()
+{    
+  // The line below is optional. It can be used to blink the LED on the board during flashing
+  // The LED will be on during download of one buffer of data from the network. The LED will
+  // be off during writing that buffer to flash
+  // On a good connection the LED should flash regularly. On a bad connection the LED will be
+  // on much longer than it will be off. Other pins than LED_BUILTIN may be used. The second
+  // value is used to put the LED on. If the LED is on with HIGH, that value should be passed
+  // ESPhttpUpdate.setLedPin(LED_BUILTIN, LOW);
+
+  // Add optional callback notifiers
+  /* Not supported by ESP32 version */
+  // httpUpdate.onStart(update_started);
+  // httpUpdate.onEnd(update_finished);
+  // httpUpdate.onProgress(update_progress);
+  // httpUpdate.onError(update_error);
+
+  t_httpUpdate_return ret = httpUpdate.update(client, "http://192.168.42.1:1880/esp8266-ota/OTA_"+String(BUILD_ENV_NAME)+"_"+String(gitHEAD)+".bin");
+  // Or:
+  //t_httpUpdate_return ret = ESPhttpUpdate.update(client, "server", 80, "file.bin");
+
+  switch (ret) {
+    case HTTP_UPDATE_FAILED:
+      Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+      break;
+
+    case HTTP_UPDATE_NO_UPDATES:
+      Serial.println("HTTP_UPDATE_NO_UPDATES");
+      break;
+
+    case HTTP_UPDATE_OK:
+      Serial.println("HTTP_UPDATE_OK");
+      break;
+  }
+  return ret;
+} 
+
 /*****************************************************
  *
  * getchipid() for ESP32
@@ -199,6 +247,28 @@ int adc_divisor = 1;
 int adc_offset = 0;
 
 DallasTemperature DSTemp;
+
+// /*****************************************************
+//  *
+//  * OTA Update Callbacks 
+//  *
+//  *****************************************************/
+// void update_started() {
+//   Serial.println("CALLBACK:  HTTP update process started");
+// }
+
+// void update_finished() {
+//   Serial.println("CALLBACK:  HTTP update process finished");
+// }
+
+// void update_progress(int cur, int total) {
+//   Serial.printf("CALLBACK:  HTTP update process at %d of %d bytes...\n", cur, total);
+// }
+
+// void update_error(int err) {
+//   Serial.printf("CALLBACK:  HTTP update fatal error code %d\n", err);
+// }
+
 /*****************************************************
  *
  * Connect to WiFi 
@@ -382,6 +452,7 @@ void setup()
   //  Connect to AP
   if (connect_wifi())
   {
+    WiFiClient client;
     // request a device id (devid string)
     if (request_bind())
     {
