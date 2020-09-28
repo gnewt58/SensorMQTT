@@ -171,7 +171,7 @@ String cid(getChipId(sChipID));
  * OTA function
  * 
  ****************************************************/
-t_httpUpdate_return try_OTA()
+t_httpUpdate_return try_OTA(String tf)
 {    
   // The line below is optional. It can be used to blink the LED on the board during flashing
   // The LED will be on during download of one buffer of data from the network. The LED will
@@ -188,7 +188,7 @@ t_httpUpdate_return try_OTA()
   // httpUpdate.onProgress(update_progress);
   // httpUpdate.onError(update_error);
 
-  t_httpUpdate_return ret = httpUpdate.update(client, "http://192.168.42.1:1880/esp8266-ota/OTA_"+String(BUILD_ENV_NAME)+"_"+String(gitHEAD)+".bin");
+  t_httpUpdate_return ret = httpUpdate.update(client, "http://192.168.42.1:1880/esp8266-ota/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
   // Or:
   //t_httpUpdate_return ret = ESPhttpUpdate.update(client, "server", 80, "file.bin");
 
@@ -342,6 +342,13 @@ void setvar(String var)
   if (var == "sleepdur")
   {
     sleepdur = value.toInt();
+  }
+  else if ( var == "target_firmware")
+  {
+    if( value != String(gitHEAD))
+    {
+      try_OTA(value);
+    }
   }
   else if (var == "valvecount")
   {
