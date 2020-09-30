@@ -164,6 +164,26 @@ String cid(ESP.getChipId());
 char sChipID[13];
 static char *getChipId(char *);
 String cid(getChipId(sChipID));
+/*****************************************************
+ *
+ * getchipid() for ESP32
+ *
+ *****************************************************/
+static char *getChipId(char *sChipID)
+{
+  uint64_t chipid;
+  chipid = ESP.getEfuseMac();                                               //The chip ID is essentially its MAC address(length: 6 bytes).
+  sprintf(sChipID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid); //print High 2 then Low 4 bytes.
+  return sChipID;
+}
+#endif
+// devid should be provided by mqtt quasi-bind client
+// default value is set here
+String devid("DEV" + cid);
+
+// WiFi and MQTT client objects
+WiFiClient wclient;
+PubSubClient mqttclient(wclient);
 
 
 /****************************************************
@@ -188,9 +208,9 @@ t_httpUpdate_return try_OTA(String tf)
   // httpUpdate.onProgress(update_progress);
   // httpUpdate.onError(update_error);
 
-  t_httpUpdate_return ret = httpUpdate.update(client, "http://192.168.42.1:1880/esp8266-ota/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+  t_httpUpdate_return ret = httpUpdate.update(wclient, "http://192.168.42.1:18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
   // Or:
-  //t_httpUpdate_return ret = ESPhttpUpdate.update(client, "server", 80, "file.bin");
+  //t_httpUpdate_return ret = ESPhttpUpdate.update(wclient, "server", 80, "file.bin");
 
   switch (ret) {
     case HTTP_UPDATE_FAILED:
@@ -208,27 +228,6 @@ t_httpUpdate_return try_OTA(String tf)
   return ret;
 } 
 
-/*****************************************************
- *
- * getchipid() for ESP32
- *
- *****************************************************/
-static char *getChipId(char *sChipID)
-{
-  uint64_t chipid;
-  chipid = ESP.getEfuseMac();                                               //The chip ID is essentially its MAC address(length: 6 bytes).
-  sprintf(sChipID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid); //print High 2 then Low 4 bytes.
-  return sChipID;
-}
-#endif
-
-// devid should be provided by mqtt quasi-bind client
-// default value is set here
-String devid("DEV" + cid);
-
-// WiFi and MQTT client objects
-WiFiClient wclient;
-PubSubClient mqttclient(wclient);
 
 // Default sleep of one minute
 long sleepdur = ONEMINUTE;
@@ -459,7 +458,6 @@ void setup()
   //  Connect to AP
   if (connect_wifi())
   {
-    WiFiClient client;
     // request a device id (devid string)
     if (request_bind())
     {

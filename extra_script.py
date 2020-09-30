@@ -13,7 +13,7 @@ print(defines,sep='}{',end='\n\n')
 # Generic
 env.Replace(
     UPLOADER="scp",
-    UPLOADCMD="$UPLOADER $SOURCE pringlei:/media/firmware/${UPLOADERFLAGS}_`git rev-parse HEAD`.bin"
+    UPLOADCMD="$UPLOADER $SOURCE pringlei:/var/www/iot-firmware/${UPLOADERFLAGS}_`git rev-parse HEAD`.bin"
 )
 
 # In-line command with arguments
