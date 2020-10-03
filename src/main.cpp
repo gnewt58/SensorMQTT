@@ -355,18 +355,16 @@ void setvar(String var)
   }
   else if ( var == "target_firmware")
   {
-#ifdef GIT_HEAD_VERSION
     SDEBUG_PRINTLN(GIT_HEAD_VERSION);
     if( value != String(GIT_HEAD_VERSION))
     {
       try_OTA(value);
     }
-#else
-    if( value != String(gitHEAD))
+    else
     {
-      try_OTA(value);
+      SDEBUG_PRINT("Already at target version: ");
+      SDEBUG_PRINTLN(value);
     }
-#endif
   }
   else if (var == "valvecount")
   {
@@ -468,7 +466,7 @@ void setup()
   SDEBUG_PRINT("PIO_ENV: ");
   SDEBUG_PRINT(buildENV);
   SDEBUG_PRINT(", GIT: ");
-  SDEBUG_PRINTLN(gitHEAD);
+  SDEBUG_PRINTLN(GIT_HEAD_VERSION);
   SDEBUG_PRINTLN("============================================");
 
   // MQTT initialise
