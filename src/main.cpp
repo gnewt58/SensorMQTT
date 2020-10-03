@@ -2,7 +2,7 @@
  * Basic framework test
  *
  */
-// Comment this out to strip all debugging messages
+// Comment this out to strip all debugging messages (now defined in platformio.ini)
 //#define SERIAL_DEBUG true
 #include "serial-debug.h"
 #include <Arduino.h>
@@ -208,7 +208,17 @@ t_httpUpdate_return try_OTA(String tf)
   // httpUpdate.onProgress(update_progress);
   // httpUpdate.onError(update_error);
 
-  t_httpUpdate_return ret = httpUpdate.update(wclient, "http://192.168.42.1:18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+  // This will be true EXCEPT for very first OTA update after a serial firmware load
+  if( String(BUILD_ENV_NAME).startsWith("OTA_"))
+  {
+    SDEBUG_PRINTLN("Trying http://192.168.42.1:18169/"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+    t_httpUpdate_return ret = httpUpdate.update(wclient, "http://192.168.42.1:18169/"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+  }
+  else
+  {
+    SDEBUG_PRINTLN("Trying http://192.168.42.1:18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+    t_httpUpdate_return ret = httpUpdate.update(wclient, "http://192.168.42.1:18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+  }
   // Or:
   //t_httpUpdate_return ret = ESPhttpUpdate.update(wclient, "server", 80, "file.bin");
 
@@ -344,10 +354,18 @@ void setvar(String var)
   }
   else if ( var == "target_firmware")
   {
+#ifdef GIT_HEAD_VERSION
+    SDEBUG_PRINTLN(GIT_HEAD_VERSION);
+    if( value != String(GIT_HEAD_VERSION))
+    {
+      try_OTA(value);
+    }
+#else
     if( value != String(gitHEAD))
     {
       try_OTA(value);
     }
+#endif
   }
   else if (var == "valvecount")
   {

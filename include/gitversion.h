@@ -1,1 +1,1 @@
-const char *gitHEAD = "ea3dfd5537f9f928d049f6d5f80242ca1541951b";
+const char *gitHEAD = "e3df9a4aec30cee14dcdb690546b85b0c8f387b7";

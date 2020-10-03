@@ -1,13 +1,13 @@
 Import("env", "projenv")
 
 # access to global build environment
-print(env)
+# print(env)
 
 # access to project build environment (is used source files in "src" folder)
-print(projenv)
-my_flags = env.ParseFlags(env['BUILD_FLAGS'])
-defines = {k: v for (k, v) in my_flags.get("CPPDEFINES")}
-print(defines,sep='}{',end='\n\n')
+# print(projenv)
+# my_flags = env.ParseFlags(env['BUILD_FLAGS'])
+# defines = {k: v for (k, v) in my_flags.get("CPPDEFINES")}
+# print(defines,sep='}{',end='\n\n')
 # please keep $SOURCE variable, it will be replaced with a path to firmware
 
 # Generic
