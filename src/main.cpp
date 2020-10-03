@@ -193,6 +193,7 @@ PubSubClient mqttclient(wclient);
  ****************************************************/
 t_httpUpdate_return try_OTA(String tf)
 {    
+  t_httpUpdate_return ret;
   // The line below is optional. It can be used to blink the LED on the board during flashing
   // The LED will be on during download of one buffer of data from the network. The LED will
   // be off during writing that buffer to flash
@@ -212,12 +213,12 @@ t_httpUpdate_return try_OTA(String tf)
   if( String(BUILD_ENV_NAME).startsWith("OTA_"))
   {
     SDEBUG_PRINTLN("Trying http://192.168.42.1:18169/"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
-    t_httpUpdate_return ret = httpUpdate.update(wclient, "http://192.168.42.1:18169/"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+    ret = httpUpdate.update(wclient, "http://192.168.42.1:18169/"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
   }
   else
   {
     SDEBUG_PRINTLN("Trying http://192.168.42.1:18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
-    t_httpUpdate_return ret = httpUpdate.update(wclient, "http://192.168.42.1:18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+    ret = httpUpdate.update(wclient, "http://192.168.42.1:18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
   }
   // Or:
   //t_httpUpdate_return ret = ESPhttpUpdate.update(wclient, "server", 80, "file.bin");
