@@ -208,17 +208,17 @@ t_httpUpdate_return try_OTA(String tf)
   // httpUpdate.onEnd(update_finished);
   // httpUpdate.onProgress(update_progress);
   // httpUpdate.onError(update_error);
-
+  
   // This will be true EXCEPT for very first OTA update after a serial firmware load
   if( String(BUILD_ENV_NAME).startsWith("OTA_"))
   {
-    SDEBUG_PRINTLN("Trying http://192.168.42.1:18169/"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
-    ret = httpUpdate.update(wclient, "http://192.168.42.1:18169/"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+    SDEBUG_PRINTLN("Trying http://"+WiFi.gatewayIP().toString()+":18169/"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+    ret = httpUpdate.update(wclient, "http://"+WiFi.gatewayIP().toString()+":18169/"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
   }
   else
   {
-    SDEBUG_PRINTLN("Trying http://192.168.42.1:18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
-    ret = httpUpdate.update(wclient, "http://192.168.42.1:18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+    SDEBUG_PRINTLN("Trying http://"+WiFi.gatewayIP().toString()+":18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+    ret = httpUpdate.update(wclient, "http://"+WiFi.gatewayIP().toString()+":18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
   }
   // Or:
   //t_httpUpdate_return ret = ESPhttpUpdate.update(wclient, "server", 80, "file.bin");
