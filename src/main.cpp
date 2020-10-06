@@ -461,14 +461,14 @@ void setup()
 
   Serial.begin(115200);
 
-  SDEBUG_PRINTLN("============================================");
-  SDEBUG_PRINTLN(SKETCHVERS);
-  SDEBUG_PRINTLN("cid: " + cid + ", devid: " + devid + "\n");
-  SDEBUG_PRINT("PIO_ENV: ");
-  SDEBUG_PRINT(buildENV);
-  SDEBUG_PRINT(", GIT: ");
-  SDEBUG_PRINTLN(GIT_HEAD_VERSION);
-  SDEBUG_PRINTLN("============================================");
+  Serial.println("============================================");
+  Serial.println(SKETCHVERS);
+  Serial.println("cid: " + cid + ", devid: " + devid + "\n");
+  Serial.print("PIO_ENV: ");
+  Serial.print(buildENV);
+  Serial.print(", GIT: ");
+  Serial.println(GIT_HEAD_VERSION);
+  Serial.println("============================================");
 
   // MQTT initialise
   mqttclient.setCallback(mqttcallback);
