@@ -766,16 +766,18 @@ void read_sensors()
           SDEBUG_PRINT("BaroSensor not Found/OK. Error: ");
           // SDEBUG_PRINTLN(BaroSensor.getError());
           // BaroSensor.begin(); // Try to reinitialise the sensor if we can
-          status = bme.begin(0x76);
+          status = bme.begin(0x76,&Wire);
         }
         else
         {
-          float t,p,h;
+          float t;
+          float p;
+          float h;
           SDEBUG_PRINT("BaroSensor Temperature:\t");
           t =  bme.readTemperature();
           SDEBUG_PRINTLN(t);
           SDEBUG_PRINT("BaroSensor Pressure:\t");
-          p = bme.readPressure()/100.0F // divide by 100 to get hectoPascal hPa
+          p = bme.readPressure()/100.0F; // divide by 100 to get hectoPascal hPa
           SDEBUG_PRINTLN(p); 
           SDEBUG_PRINT("BaroSensor Humidity:\t");
           h = bme.readHumidity();

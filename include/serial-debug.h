@@ -1,7 +1,7 @@
 #ifndef _SERIAL_DEBUG_H_
 #define _SERIAL_DEBUG_H_
 # ifdef SERIAL_DEBUG
-#  if SERIAL_DEBUG // is true
+#  if SERIAL_DEBUG 
 #   define SDEBUG_PRINT(...) { Serial.print(__VA_ARGS__); }
 #   define SDEBUG_PRINTLN(...) { Serial.println(__VA_ARGS__); }
 #   define SDEBUG_PRINTF(...) { Serial.printf(__VA_ARGS__); }
