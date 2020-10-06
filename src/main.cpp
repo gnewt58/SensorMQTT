@@ -759,8 +759,6 @@ void read_sensors()
       //BaroSensor.begin();
       status = bme.begin(0x76,&Wire); // Default BME address
       brief_pause();
-      brief_pause();
-      brief_pause();
       if (mqttclient.connected())
       {
         if (!status)
@@ -772,19 +770,20 @@ void read_sensors()
         }
         else
         {
+          float t,p,h;
           SDEBUG_PRINT("BaroSensor Temperature:\t");
-          SDEBUG_PRINTLN(bme.readTemperature());
+          t =  bme.readTemperature();
+          SDEBUG_PRINTLN(t);
           SDEBUG_PRINT("BaroSensor Pressure:\t");
-          SDEBUG_PRINTLN(bme.readPressure());
+          p = bme.readPressure()/100.0F // divide by 100 to get hectoPascal hPa
+          SDEBUG_PRINTLN(p); 
+          SDEBUG_PRINT("BaroSensor Humidity:\t");
+          h = bme.readHumidity();
+          SDEBUG_PRINTLN(h);
           // Hierarchy is sensors/<deviceid>/<sensorid>/<parameter>
-          mqttclient.publish(("sensors/" + devid + "/baro-T/degC").c_str(), String(bme.readTemperature()).c_str());
-          brief_pause();
-      brief_pause();
-      brief_pause();
-          mqttclient.publish(("sensors/" + devid + "/baro-p/mbar").c_str(), String(bme.readPressure()).c_str());
-          brief_pause();
-          mqttclient.publish(("sensors/" + devid + "/baro-h/%").c_str(), String(bme.readHumidity()).c_str());
-          brief_pause();
+          mqttclient.publish(("sensors/" + devid + "/baro-T/degC").c_str(), String(t).c_str());
+          mqttclient.publish(("sensors/" + devid + "/baro-p/hPa").c_str(), String(p).c_str());
+          mqttclient.publish(("sensors/" + devid + "/baro-h/%").c_str(), String(h).c_str());
         }
       }
     }
