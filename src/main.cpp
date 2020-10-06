@@ -37,7 +37,6 @@
 
 #include "private-data.h"
 #include "SensorMQTT.hpp"
-#include "gitversion.h"
 #define SKETCHVERS ("v." __DATE__)
 
 #ifdef SERIAL_DEBUG
@@ -461,12 +460,12 @@ void setup()
 
   Serial.begin(115200);
 
-  Serial.println("============================================");
+  Serial.println("\n============================================");
   Serial.println(SKETCHVERS);
-  Serial.println("cid: " + cid + ", devid: " + devid + "\n");
+  Serial.println("cid: " + cid + ", devid: " + devid);
   Serial.print("PIO_ENV: ");
-  Serial.print(buildENV);
-  Serial.print(", GIT: ");
+  Serial.println(buildENV);
+  Serial.print("GIT: ");
   Serial.println(GIT_HEAD_VERSION);
   Serial.println("============================================");
 
@@ -587,7 +586,8 @@ int request_bind()
   SDEBUG_PRINTF("mqttclient.state()=%d\n", mqttclient.state());
   if (!mqttclient.connected())
   {
-    mqttclient.setServer(IPAddress(192, 168, MQTT_OCTET3, 1), 1883);
+    // MQTT broker lives on the IOT gateway
+    mqttclient.setServer(WiFi.gatewayIP(), 1883);
     if (!mqttclient.connect(("Client-" + devid).c_str(), MQTT_USER, MQTT_PASSWORD))
     {
       SDEBUG_PRINTLN("Failed to connect to MQTT broker");
