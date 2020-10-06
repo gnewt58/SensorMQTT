@@ -26,7 +26,8 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <Wire.h>
-#include <BaroSensor.h>
+//#include <BaroSensor.h>
+#include <Adafruit_BME280.h>
 
 /*****************************************************
  *
@@ -745,6 +746,8 @@ void read_sensors()
     else if (sensortype[i] == SENSORBARO)
     {
       char *pintok, *strtokk;
+      bool status;
+      Adafruit_BME280 bme;
       // Split sensorpins to get SDA and SCL separately
       SDEBUG_PRINTLN("sensorpins[" + String(i) + "] = '" + sensorpins[i] + "'");
       pintok = strtok_r(sensorpins[i], ",", &strtokk);
@@ -753,26 +756,34 @@ void read_sensors()
       uint8_t sclpin = atoi(pintok);
       SDEBUG_PRINTLN("Wire.begin(" + String(sdapin) + "," + String(sclpin) + ");");
       Wire.begin(sdapin, sclpin);
-      BaroSensor.begin();
+      //BaroSensor.begin();
+      status = bme.begin(0x76,&Wire); // Default BME address
+      brief_pause();
+      brief_pause();
       brief_pause();
       if (mqttclient.connected())
       {
-        if (!BaroSensor.isOK())
+        if (!status)
         {
           SDEBUG_PRINT("BaroSensor not Found/OK. Error: ");
-          SDEBUG_PRINTLN(BaroSensor.getError());
-          BaroSensor.begin(); // Try to reinitialise the sensor if we can
+          // SDEBUG_PRINTLN(BaroSensor.getError());
+          // BaroSensor.begin(); // Try to reinitialise the sensor if we can
+          status = bme.begin(0x76);
         }
         else
         {
           SDEBUG_PRINT("BaroSensor Temperature:\t");
-          SDEBUG_PRINTLN(BaroSensor.getTemperature());
+          SDEBUG_PRINTLN(bme.readTemperature());
           SDEBUG_PRINT("BaroSensor Pressure:\t");
-          SDEBUG_PRINTLN(BaroSensor.getPressure());
+          SDEBUG_PRINTLN(bme.readPressure());
           // Hierarchy is sensors/<deviceid>/<sensorid>/<parameter>
-          mqttclient.publish(("sensors/" + devid + "/baro-T/degC").c_str(), String(BaroSensor.getTemperature()).c_str());
+          mqttclient.publish(("sensors/" + devid + "/baro-T/degC").c_str(), String(bme.readTemperature()).c_str());
           brief_pause();
-          mqttclient.publish(("sensors/" + devid + "/baro-p/mbar").c_str(), String(BaroSensor.getPressure()).c_str());
+      brief_pause();
+      brief_pause();
+          mqttclient.publish(("sensors/" + devid + "/baro-p/mbar").c_str(), String(bme.readPressure()).c_str());
+          brief_pause();
+          mqttclient.publish(("sensors/" + devid + "/baro-h/%").c_str(), String(bme.readHumidity()).c_str());
           brief_pause();
         }
       }
