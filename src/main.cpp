@@ -213,12 +213,14 @@ t_httpUpdate_return try_OTA(String tf)
   if( String(BUILD_ENV_NAME).startsWith("OTA_"))
   {
     SDEBUG_PRINTLN("Trying http://"+WiFi.gatewayIP().toString()+":18169/"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
-    ret = httpUpdate.update(wclient, "http://"+WiFi.gatewayIP().toString()+":18169/"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+    // ret = httpUpdate.update(wclient, "http://"+WiFi.gatewayIP().toString()+":18169/"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+    ret = httpUpdate.update(wclient, WiFi.gatewayIP().toString(),18169,String(BUILD_ENV_NAME)+"_"+tf+".bin");
   }
   else
   {
     SDEBUG_PRINTLN("Trying http://"+WiFi.gatewayIP().toString()+":18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
-    ret = httpUpdate.update(wclient, "http://"+WiFi.gatewayIP().toString()+":18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+    // ret = httpUpdate.update(wclient, "http://"+WiFi.gatewayIP().toString()+":18169/OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
+    ret = httpUpdate.update(wclient, WiFi.gatewayIP().toString(),18169,"OTA_"+String(BUILD_ENV_NAME)+"_"+tf+".bin");
   }
   // Or:
   //t_httpUpdate_return ret = ESPhttpUpdate.update(wclient, "server", 80, "file.bin");
@@ -491,7 +493,7 @@ void setup()
       mqttclient.subscribe(("control/" + devid + "/#").c_str());
       mqttclient.subscribe(("persist/" + devid + "/set").c_str());
       // Save current status (firmware, buildtime, ip)
-      mqttclient.publish(("status/" + devid).c_str(), (String("firmware=") + String(gitHEAD)).c_str());
+      mqttclient.publish(("status/" + devid).c_str(), (String("firmware=") + String(GIT_HEAD_VERSION)).c_str());
       mqttclient.publish(("status/" + devid).c_str(), (String("buildtime=") + __DATE__ + " " + __TIME__).c_str());
       mqttclient.publish(("status/" + devid).c_str(), (String("ip=") + WiFi.localIP().toString()).c_str());
       // And then request all persistent variables back again
